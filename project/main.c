@@ -1,11 +1,7 @@
 #include "stm32f767xx.h"
-//#include "system_init.h"
-//#include "led_hw.h"
+#include "system_init.h"
+#include "led_hw.h"
 //#include "app_ccd_control.h"
-
-
-//#include "ccd_spi_hw.h"
-
 
 #define BUF_SIZE 10
 
@@ -22,24 +18,24 @@ void fill_buffer(uint16_t * Buf, uint16_t size);
 
 int main(void)
 {
-  /*
+  
   uint16_t Buf[BUF_SIZE] = {0};
   fill_buffer(Buf, BUF_SIZE);
   
   system_clock_config();
-  led_init();
+  leds_init();
   //uart_init_all();
-  init_all_ccd();
-  */
+
+  
   while (1)
   {
-    /*
+    
     system_delay(200);
     led_green_on();
     
-    system_delay(200);
+    system_delay(300);
     led_green_off();
-*/
+
     
     //ccd_send_SPI_buf ((uint32_t *)((void *)&Buf[0]), BUF_SIZE);
       

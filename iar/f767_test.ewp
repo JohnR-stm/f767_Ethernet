@@ -2182,12 +2182,36 @@
     </configuration>
     <group>
         <name>application</name>
+        <file>
+            <name>$PROJ_DIR$\..\project\application\system_init.c</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\project\application\system_init.h</name>
+        </file>
     </group>
     <group>
         <name>config</name>
+        <file>
+            <name>$PROJ_DIR$\..\project\mdl_config\led_config.h</name>
+        </file>
     </group>
     <group>
         <name>mdl</name>
+        <group>
+            <name>stm32</name>
+            <group>
+                <name>LED</name>
+                <file>
+                    <name>$PROJ_DIR$\..\project\mdl\stm32\led\led_hw.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\project\mdl\stm32\led\led_hw.h</name>
+                </file>
+            </group>
+            <group>
+                <name>UART</name>
+            </group>
+        </group>
     </group>
     <group>
         <name>ST</name>
@@ -2232,6 +2256,48 @@
         </group>
         <group>
             <name>LL</name>
+            <file>
+                <name>$PROJ_DIR$\..\project\ST\ll\stm32f7xx_ll_bus.h</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\project\ST\ll\stm32f7xx_ll_cortex.h</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\project\ST\ll\stm32f7xx_ll_exti.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\project\ST\ll\stm32f7xx_ll_exti.h</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\project\ST\ll\stm32f7xx_ll_gpio.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\project\ST\ll\stm32f7xx_ll_gpio.h</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\project\ST\ll\stm32f7xx_ll_pwr.h</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\project\ST\ll\stm32f7xx_ll_rcc.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\project\ST\ll\stm32f7xx_ll_rcc.h</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\project\ST\ll\stm32f7xx_ll_system.h</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\project\ST\ll\stm32f7xx_ll_usart.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\project\ST\ll\stm32f7xx_ll_usart.h</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\project\ST\ll\stm32f7xx_ll_utils.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\project\ST\ll\stm32f7xx_ll_utils.h</name>
+            </file>
         </group>
     </group>
     <file>

@@ -1,0 +1,3 @@
+[submodule "project/mdl/stm32"]
+	path = project/mdl/stm32
+	url = https://github.com/JohnR-stm/mdl_stm32.git
