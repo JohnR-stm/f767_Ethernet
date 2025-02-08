@@ -3,6 +3,8 @@
 #include "led_hw.h"
 //#include "app_ccd_control.h"
 
+#include "app_ethernet.h"
+
 #define BUF_SIZE 10
 
 
@@ -25,17 +27,24 @@ int main(void)
   system_clock_config();
   leds_init();
   //uart_init_all();
+  
+  //--- ETHERNET ---
+  ETH_fill_buffer();
+  ETH_pins_init();
+  ETH_init();
 
   
   while (1)
   {
-    
-    system_delay(200);
+    system_delay(50);
     led_green_on();
     
-    system_delay(300);
+    system_delay(100);
     led_green_off();
+    //RunTx();
 
+    //ETH_receive_pack();
+    ETH_transmit_pack();
     
     //ccd_send_SPI_buf ((uint32_t *)((void *)&Buf[0]), BUF_SIZE);
       

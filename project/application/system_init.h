@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#define SYS_FREQ        100000000
+
 #define PEND_SV_PRIORITY  15
 #define SYS_TICK_PRIORITY 15
 

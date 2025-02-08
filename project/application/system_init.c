@@ -46,8 +46,8 @@ void system_clock_config(void)
   {  }
   
   //--- timer delay in utils.h ---//
-  LL_Init1msTick(100000000);
-  LL_SetSystemCoreClock(100000000);
+  LL_Init1msTick(SYS_FREQ);
+  LL_SetSystemCoreClock(SYS_FREQ);
 }
 
 //-----------------------------------------------------------------------------

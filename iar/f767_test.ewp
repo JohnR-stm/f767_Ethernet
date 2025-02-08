@@ -359,6 +359,7 @@
                     <state>$PROJ_DIR$\..\project\mdl\stm32</state>
                     <state>$PROJ_DIR$\..\project\mdl\stm32\uart</state>
                     <state>$PROJ_DIR$\..\project\mdl\stm32\led</state>
+                    <state>$PROJ_DIR$\..\project\Ethernet</state>
                     <state>$PROJ_DIR$\..\project\mdl_config</state>
                     <state>$PROJ_DIR$\..\project\application</state>
                     <state>$PROJ_DIR$\..\project\ST</state>
@@ -615,7 +616,7 @@
                 </option>
                 <option>
                     <name>AOutputFile</name>
-                    <state></state>
+                    <state>$FILE_BNAME$.o</state>
                 </option>
                 <option>
                     <name>ALimitErrorsCheck</name>
@@ -2183,6 +2184,12 @@
     <group>
         <name>application</name>
         <file>
+            <name>$PROJ_DIR$\..\project\application\app_ethernet.c</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\project\application\app_ethernet.h</name>
+        </file>
+        <file>
             <name>$PROJ_DIR$\..\project\application\system_init.c</name>
         </file>
         <file>
@@ -2193,6 +2200,15 @@
         <name>config</name>
         <file>
             <name>$PROJ_DIR$\..\project\mdl_config\led_config.h</name>
+        </file>
+    </group>
+    <group>
+        <name>Ethernet</name>
+        <file>
+            <name>$PROJ_DIR$\..\project\Ethernet\stm32_eth.c</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\project\Ethernet\stm32_eth.h</name>
         </file>
     </group>
     <group>
@@ -2207,9 +2223,6 @@
                 <file>
                     <name>$PROJ_DIR$\..\project\mdl\stm32\led\led_hw.h</name>
                 </file>
-            </group>
-            <group>
-                <name>UART</name>
             </group>
         </group>
     </group>
