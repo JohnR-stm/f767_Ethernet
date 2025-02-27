@@ -3,16 +3,20 @@
 #include "led_hw.h"
 //#include "app_ccd_control.h"
 
+#include "stm32_eth.h"
 #include "app_ethernet.h"
 
 #define BUF_SIZE 10
 
-
+#define B
 
 char string1[] = "Hello, I'm STM32G070! \r\n";
 
 
 void fill_buffer(uint16_t * Buf, uint16_t size);
+
+uint8_t Temp_Buf[ETH_RX_BUF_SIZE]; /* Ethernet Receive Buffer */
+
 
 //----------------------------------------------------------------------------
 // MAIN
@@ -32,10 +36,13 @@ int main(void)
   ETH_fill_buffer();
   ETH_pins_init();
   ETH_init();
+  
+  uint8_t PackageType = 0; //ReadBufRx();
 
   
   while (1)
   {
+#ifdef A
     system_delay(50);
     led_green_on();
     
@@ -45,9 +52,39 @@ int main(void)
 
     //ETH_receive_pack();
     ETH_transmit_pack();
+#endif
     
-    //ccd_send_SPI_buf ((uint32_t *)((void *)&Buf[0]), BUF_SIZE);
+#ifdef B
+
+   // while(ETH_GetReceiveProcessState() != 0); // wait while receive process
+    
+    PackageType = ETH_HandleRxPkt(&Temp_Buf[0]);
+    
+    system_delay(2);
+    
+    if (PackageType > 0)
+    {
+     // while(ETH_GetReceiveProcessState() != 0); // wait while receive process
+      ETH_DMAReceptionCmd(DISABLE); // DISABLE Receive process
       
+      uint8_t resp = DefinePackage(Temp_Buf);
+      if (resp == 1)
+        SendARPResponse(Temp_Buf);
+      else
+        led_green_blink();
+        //ETH_transmit_pack(); 
+   
+      // if transmit process is stoped DISABLE Transmit and ENABLE Receive
+      system_delay(4);
+      ETH_DMATransmissionCmd(DISABLE);
+      ETH_DMAReceptionCmd(ENABLE);
+    }
+    
+   
+    system_delay(5);
+    
+#endif
+    
     /// send message ///
     //uart1_send_string(string1);
   }

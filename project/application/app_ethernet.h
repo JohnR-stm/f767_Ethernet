@@ -13,6 +13,12 @@ void ETH_pins_init(void);
 void ETH_init(void);
 #endif
 
+//-- new functions ---
+uint8_t DefinePackage(uint8_t * buf_input);
+void SendARPResponse(uint8_t * buf_input);
+void Set_MAC_Filter(void);
+
+
 void ETH_transmit_pack(void);
 void ETH_receive_pack(void);
 

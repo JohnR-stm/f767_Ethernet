@@ -1,14 +1,18 @@
-#include "app_ethernet.h"
-#include "stm32_eth.h"
-#include "stm32f767xx.h"
+#include <string.h>
+
 
 #ifdef STM32F7
 #include "stm32f7xx_ll_bus.h"
 #include "stm32f7xx_ll_gpio.h"
 #endif /* STM32F7 */
 
+#include "app_ethernet.h"
+#include "stm32_eth.h"
+#include "stm32f767xx.h"
 
 #define PHY_ADDRESS     0x0
+
+#define SPEC_BUF_SIZE   4
 
 //------ DEFINES -----------------------------------
 
@@ -43,7 +47,18 @@ uint8_t Rx_Buf[ETH_RXBUFNB][ETH_RX_BUF_SIZE]; /* Ethernet Receive Buffer */
 #pragma data_alignment=4
 uint8_t Tx_Buf[ETH_TXBUFNB][ETH_TX_BUF_SIZE]; 
 
+#pragma data_alignment=4
+uint8_t Spectrum_Buf[SPEC_BUF_SIZE][ETH_TX_BUF_SIZE];
 
+
+//------------------------------------------------------------------------------
+//---- static  functions --------
+//------------------------------------------------------------------------------
+
+static void CopyBuf(uint8_t * Buf_A, uint8_t * Buf_B, uint32_t value);
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 
 uint8_t ak = 0;
 
@@ -83,11 +98,19 @@ __attribute__((aligned(4))) uint8_t TX_ARP[42] = {
                        0x06, 0x04,                              // HLEN, PLEN
                        0x00, 0x01,                              // OPER
                        0x00, 0x80, 0xE1, 0x0A, 0x11, 0x07,      // MACs
-                       192,  168,  100,   157,                  // IPs
-                       0x00, 0x00, 0x00, 0x00, 0x00, 0x00,      // MACd
-                       192,  168,  100,   1,                    // IPd
+                       192,  168,  100,   157,                  // IPs   28
+                       0x00, 0x00, 0x00, 0x00, 0x00, 0x00,      // MACd  32
+                       192,  168,  100,   1,                    // IPd   38
                       };
-                       
+                   
+
+uint8_t MAC_PC[6] = {0};  // MAC-PC
+uint8_t IP_PC[4] = {0};   // IP-PC
+
+uint8_t MAC_STM[6] = {0x00, 0x80, 0xE1, 0x0A, 0x11, 0x07}; 
+uint8_t IP_STM[4] = {192,  168,  100,   157};   
+
+uint8_t TX_ARP_Resp[42] = {0};
 
 
 //---------------------------------------------------------------------------- 
@@ -96,22 +119,129 @@ __attribute__((aligned(4))) uint8_t TX_ARP[42] = {
  
 void ETH_fill_buffer(void)
 {
-  for(uint32_t cnt = 0; cnt<42; cnt++)
+  uint32_t cnt = 0;
+  uint32_t ext_cnt = 0;
+  
+  for(cnt = 0; cnt<42; cnt++)
   {
     Tx_Buf[0][cnt] = TX_ARP[cnt];
   }
   
-    for(uint32_t cnt = 0; cnt<214; cnt++)
+  for(cnt = 0; cnt<214; cnt++)
   {
     Tx_Buf[1][cnt] = TX_BUF[cnt];
   }
+  
+  //---- Fill Spectrum Buffer ----
+  for(ext_cnt = 0; ext_cnt < SPEC_BUF_SIZE; ext_cnt++)
+    for(cnt = 0; cnt < ETH_TX_BUF_SIZE; cnt++)
+    {
+      if (cnt < 40)
+        Spectrum_Buf[ext_cnt][cnt] = TX_BUF[cnt];
+      else if (cnt < 530)
+        Spectrum_Buf[ext_cnt][cnt] = (uint8_t)( ((uint8_t)(cnt - 39)/8) * (ext_cnt + 1) );
+    }
 }
 
 
 //---------------------------------------------------------------------------- 
 //---------------------------------------------------------------------------- 
 //----------------------------------------------------------------------------
- 
+//----- N E W  F U N C T I O N S --------------------------------------------- 
+//----------------------------------------------------------------------------
+
+/*
+static void CopyBuf(uint8_t * Buf_A, const uint8_t * Buf_B, uint32_t init_val, uint32_t max_val)
+{
+  if (init_val <= max_val)
+    for(uint32_t cnt = init_val; cnt < max_val; cnt++)
+    {
+        Buf_A[cnt] = Buf_B[cnt]; 
+    }
+}
+*/
+
+static void CopyBuf(uint8_t * Buf_A, uint8_t * Buf_B, uint32_t value)
+{
+  for(uint32_t cnt = 0; cnt < value; cnt++)
+  {
+    *(Buf_A + cnt) = *(Buf_B + cnt);
+  }
+}
+
+//---------------------------------------------------------------------------- 
+//---------------------------------------------------------------------------- 
+//----------------------------------------------------------------------------
+
+
+uint8_t DefinePackage(uint8_t * buf_input)
+{
+  if ( (buf_input[12] == 0x08) &&
+       (buf_input[13] == 0x06) &&
+       (buf_input[21] == 0x01) )        // ARP
+  {
+    if ( buf_input[38] == IP_STM[0] &&
+         buf_input[39] == IP_STM[1] &&
+         buf_input[40] == IP_STM[2] &&
+         buf_input[41] == IP_STM[3] )
+      return 1;
+  }  
+  return 0;
+}
+
+//---------------------------------------------------------------------------- 
+//---------------------------------------------------------------------------- 
+//----------------------------------------------------------------------------
+
+void SendARPResponse(uint8_t * buf_input) 
+{
+    CopyBuf(TX_ARP_Resp, buf_input, 42); // Copy Buf to ARP Buf
+       
+    CopyBuf(MAC_PC, TX_ARP_Resp + 6, 6);        // Store MAC Destination 
+    CopyBuf(TX_ARP_Resp, MAC_PC, 6);            // Replace MAC Destination 1
+    CopyBuf(TX_ARP_Resp + 32, MAC_PC, 6);       // Replace MAC Destination 2
+    CopyBuf(TX_ARP_Resp + 6, MAC_STM, 6);       // Replace STM32 MAC 
+    
+    CopyBuf(IP_PC, TX_ARP_Resp + 28, 4);        // Store IP Destination
+    CopyBuf(TX_ARP_Resp + 38, IP_PC, 4);        // Replace IP Destination
+    CopyBuf(TX_ARP_Resp + 28, IP_STM, 4);       // Replace IP STM32
+    
+    // Change ARP packet type (response)
+    TX_ARP_Resp[21] = 0x02; //  ARP response (OPER = 2)
+    
+    // Sending an ARP reply
+    ETH_DMATransmissionCmd(DISABLE);
+    ETH_HandleTxPkt(&TX_ARP_Resp[0], 42);
+    ETH_DMATransmissionCmd(ENABLE);
+}
+
+//---------------------------------------------------------------------------- 
+//---------------------------------------------------------------------------- 
+//----------------------------------------------------------------------------
+
+void Set_MAC_Filter(void) 
+{
+    ETH->MACA1HR = (MAC_PC[0] << 8) | MAC_PC[1];  // The upper part of the MAC address
+    ETH->MACA1LR = (MAC_PC[2] << 24) | (MAC_PC[3] << 16) | (MAC_PC[4] << 8) | MAC_PC[5]; // Lower part of MAC address
+    
+    // Filtering settings (only packets with MAC_PC and broadcast)
+    ETH->MACFFR &= ~(ETH_MACFFR_PM);  // Disable receiving all packets (Promiscuous mode)
+    ETH->MACFFR |= ETH_MACFFR_HPF | ETH_MACFFR_BFD;  // Enable filtering by MAC and broadcast packets
+}
+
+
+
+//---------------------------------------------------------------------------- 
+//---------------------------------------------------------------------------- 
+//----------------------------------------------------------------------------
+
+
+//---------------------------------------------------------------------------- 
+//---------------------------------------------------------------------------- 
+//----------------------------------------------------------------------------
+
+
+
 
 
 //// new prog
@@ -125,10 +255,10 @@ void ETH_init(void)
   RCC->AHB1RSTR|=RCC_AHB1RSTR_ETHMACRST;
   RCC->AHB1RSTR&=~RCC_AHB1RSTR_ETHMACRST; 
   
-  //---- Ethernet RCC
+  //---- Ethernet RCC -----
   RCC->AHB1ENR|=RCC_AHB1ENR_ETHMACRXEN|RCC_AHB1ENR_ETHMACTXEN|RCC_AHB1ENR_ETHMACEN;
   
-  //--- software reset
+  //--- software reset DMA ----
   ETH->DMABMR |= ETH_DMABMR_SR;
   
   //--- init parameters ETH and DMA
@@ -148,6 +278,9 @@ void ETH_init(void)
   ETH_InitStructure.ETH_MulticastFramesFilter = ETH_MulticastFramesFilter_Perfect;
   ETH_InitStructure.ETH_UnicastFramesFilter = ETH_UnicastFramesFilter_Perfect;
   
+  //-- NEW --
+  ETH->MACFFR |= ETH_MACFFR_RA;  // Receive all
+  //ETH->DMAOMR |= ETH_DMAOMR_RSF | ETH_DMAOMR_TSF; // store and forward
   //check this func (PHY)
   Value = ETH_Init(&ETH_InitStructure, PHY_ADDRESS);
   set_rmii();
@@ -160,16 +293,11 @@ void ETH_init(void)
   
   TxDscrTab[0].ControlBufferSize = 42;
   TxDscrTab[1].ControlBufferSize = 214;
-  RxDscrTab[0].ControlBufferSize = ETH_MAX_PACKET_SIZE; // \(1<<14);
-  RxDscrTab[1].ControlBufferSize = ETH_MAX_PACKET_SIZE; // \(1<<14);
-  RxDscrTab[2].ControlBufferSize = ETH_MAX_PACKET_SIZE; // \(1<<14);
-  
-  // enable Tx
-  //TxDscrTab[0].Status = ETH_DMARxDesc_OWN;
-  
+   
   //--- ETH Enable
   ETH_Start();
   
+  ETH_receive_pack();
   /*
   ETH->MACCR |= ETH_MACCR_TE;
   ETH->DMAOMR |= ETH_DMAOMR_FTF;
@@ -177,8 +305,6 @@ void ETH_init(void)
   ETH->DMAOMR |= ETH_DMAOMR_ST;
   ETH->DMAOMR |= ETH_DMAOMR_SR;
   */
-  
- // ETH_HandleTxPkt(&Tx_Buf[0][0], 100);
 
 }
 #endif
@@ -194,8 +320,7 @@ void ETH_init(void)
 void ETH_receive_pack(void)
 {
   ETH_DMAReceptionCmd(DISABLE);
-  
-  ETH_DMAReceptionCmd(ENABLE);
+  ETH_DMAReceptionCmd(ENABLE); // SR bit set
 }
 
 void ETH_transmit_pack(void)

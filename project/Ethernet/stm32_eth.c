@@ -1748,6 +1748,79 @@ uint32_t ETH_HandleTxPkt(uint8_t *ppkt, uint16_t FrameLength)
   return ETH_SUCCESS;   
 }
 
+
+/**
+  * @brief  Receives a packet and copies it to memory pointed by ppkt.
+  * @param  ppkt: pointer to the application packet receive buffer.
+  * @retval ETH_ERROR: if there is error in reception
+  *         framelength: received packet size if packet reception is correct
+  */
+uint32_t ETH_HandleRxPkt(uint8_t *ppkt)
+{ 
+  uint32_t offset = 0, framelength = 0;
+  /* Check if the descriptor is owned by the ETHERNET DMA (when set) or CPU (when reset) */
+  if((DMARxDescToGet->Status & ETH_DMARxDesc_OWN) != (uint32_t)RESET)
+  {
+    /* Return error: OWN bit set */
+    return ETH_ERROR; 
+  }
+  
+  if(((DMARxDescToGet->Status & ETH_DMARxDesc_ES) == (uint32_t)RESET) && 
+     ((DMARxDescToGet->Status & ETH_DMARxDesc_LS) != (uint32_t)RESET) &&  
+     ((DMARxDescToGet->Status & ETH_DMARxDesc_FS) != (uint32_t)RESET))  
+  {      
+    /* Get the Frame Length of the received packet: substruct 4 bytes of the CRC */
+    framelength = ((DMARxDescToGet->Status & ETH_DMARxDesc_FL) >> ETH_DMARXDESC_FRAME_LENGTHSHIFT); // ETH_DMARXDESC_FRAME_LENGTHSHIFT) - 4
+    /* Copy the received frame into buffer from memory pointed by the current ETHERNET DMA Rx descriptor */
+    for(offset=0; offset<framelength; offset++)       
+    {
+      (*(ppkt + offset)) = (*(__IO uint8_t *)((DMARxDescToGet->Buffer1Addr) + offset));
+    }
+  }
+  else
+  {
+    /* Return ERROR */
+    framelength = ETH_ERROR;
+  }
+  /* Set Own bit of the Rx descriptor Status: gives the buffer back to ETHERNET DMA */
+  DMARxDescToGet->Status = ETH_DMARxDesc_OWN; 
+ 
+  /* When Rx Buffer unavailable flag is set: clear it and resume reception */
+  if ((ETH->DMASR & ETH_DMASR_RBUS) != (uint32_t)RESET)  
+  {
+    /* Clear RBUS ETHERNET DMA flag */
+    ETH->DMASR = ETH_DMASR_RBUS;
+    /* Resume DMA reception */
+    ETH->DMARPDR = 0;
+  }
+  
+  /* Update the ETHERNET DMA global Rx descriptor with next Rx decriptor */      
+  /* Chained Mode */
+  if((DMARxDescToGet->ControlBufferSize & ETH_DMARxDesc_RCH) != (uint32_t)RESET)
+  {     
+    /* Selects the next DMA Rx descriptor list for next buffer to read */ 
+    DMARxDescToGet = (ETH_DMADESCTypeDef*) (DMARxDescToGet->Buffer2NextDescAddr);    
+  }
+  else /* Ring Mode */
+  {   
+    if((DMARxDescToGet->ControlBufferSize & ETH_DMARxDesc_RER) != (uint32_t)RESET)
+    {
+      /* Selects the first DMA Rx descriptor for next buffer to read: last Rx descriptor was used */
+      DMARxDescToGet = (ETH_DMADESCTypeDef*) (ETH->DMARDLAR);      
+    }
+    else
+    { 
+      /* Selects the next DMA Rx descriptor list for next buffer to read */
+      DMARxDescToGet = (ETH_DMADESCTypeDef*) ((uint32_t)DMARxDescToGet + 0x10 + ((ETH->DMABMR & ETH_DMABMR_DSL) >> 2));      
+    }
+  }
+  
+  /* Return Frame Length/ERROR */
+  return (framelength);  
+}
+
+
+
 #ifdef USE_ENHANCED_DMA_DESCRIPTORS
 /**
   * @brief  Enables or disables the Enhanced descriptor structure.

@@ -241,7 +241,7 @@ typedef struct  {
 
 /* 5 Ethernet driver receive buffers are used (in a chained linked list)*/ 
 #ifndef ETH_RXBUFNB
- #define ETH_RXBUFNB             5     /*  5 Rx buffers of size ETH_RX_BUF_SIZE */
+ #define ETH_RXBUFNB             2     /*  5 Rx buffers of size ETH_RX_BUF_SIZE */
 #endif
 
 
@@ -1605,7 +1605,7 @@ void  ETH_Start(void);
 uint32_t ETH_GetRxPktSize(ETH_DMADESCTypeDef *DMARxDesc);
 
 uint32_t ETH_HandleTxPkt(u8 *ppkt, u16 FrameLength);
-
+uint32_t ETH_HandleRxPkt(uint8_t *ppkt);
 
 #ifdef USE_ENHANCED_DMA_DESCRIPTORS
  void ETH_EnhancedDescriptorCmd(FunctionalState NewState);
