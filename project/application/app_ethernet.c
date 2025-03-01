@@ -10,6 +10,8 @@
 #include "stm32_eth.h"
 #include "stm32f767xx.h"
 
+#include "led_hw.h"
+
 #define PHY_ADDRESS     0x0
 
 #define SPEC_BUF_SIZE   4
@@ -62,6 +64,8 @@ static void CopyBuf(uint8_t * Buf_A, uint8_t * Buf_B, uint32_t value);
 
 uint8_t ak = 0;
 
+static uint8_t Tmp_Buf[ETH_RX_BUF_SIZE]; /* Ethernet Receive Buffer */
+
 //--------------------------------------------------
 
 //--- list of descriptors
@@ -92,15 +96,15 @@ uint8_t TX_BUF[214] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,      // MACd
 
 __attribute__((aligned(4))) uint8_t TX_ARP[42] = {
                        0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,      // MACd
-                       0x00, 0x80, 0xE1, 0x0A, 0x11, 0x07,      // MACs
+                       0x00, 0x80, 0xE1, 0x0A, 0x11, 0x07,      // MACs  [6]
                        0x08, 0x06,                              // EtherType
                        0x00, 0x01, 0x08, 0x00,                  // HTYPE, PTYPE
                        0x06, 0x04,                              // HLEN, PLEN
                        0x00, 0x01,                              // OPER
-                       0x00, 0x80, 0xE1, 0x0A, 0x11, 0x07,      // MACs
-                       192,  168,  100,   157,                  // IPs   28
-                       0x00, 0x00, 0x00, 0x00, 0x00, 0x00,      // MACd  32
-                       192,  168,  100,   1,                    // IPd   38
+                       0x00, 0x80, 0xE1, 0x0A, 0x11, 0x07,      // MACs  [22]
+                       192,  168,  100,   157,                  // IPs   [28]
+                       0x00, 0x00, 0x00, 0x00, 0x00, 0x00,      // MACd  [32]
+                       192,  168,  100,   1,                    // IPd   [38]
                       };
                    
 
@@ -150,16 +154,6 @@ void ETH_fill_buffer(void)
 //----- N E W  F U N C T I O N S --------------------------------------------- 
 //----------------------------------------------------------------------------
 
-/*
-static void CopyBuf(uint8_t * Buf_A, const uint8_t * Buf_B, uint32_t init_val, uint32_t max_val)
-{
-  if (init_val <= max_val)
-    for(uint32_t cnt = init_val; cnt < max_val; cnt++)
-    {
-        Buf_A[cnt] = Buf_B[cnt]; 
-    }
-}
-*/
 
 static void CopyBuf(uint8_t * Buf_A, uint8_t * Buf_B, uint32_t value)
 {
@@ -186,6 +180,18 @@ uint8_t DefinePackage(uint8_t * buf_input)
          buf_input[41] == IP_STM[3] )
       return 1;
   }  
+  else
+   if ( (buf_input[0] == MAC_STM[0]) &&
+        (buf_input[1] == MAC_STM[1]) &&
+        (buf_input[2] == MAC_STM[2]) &&
+        (buf_input[3] == MAC_STM[3]) &&
+        (buf_input[4] == MAC_STM[4]) &&
+        (buf_input[5] == MAC_STM[5]) )      
+  {
+    if ( buf_input[12] == 0x08 &&
+         buf_input[13] == 0x00)         // IP
+      return 2;
+  }
   return 0;
 }
 
@@ -201,6 +207,7 @@ void SendARPResponse(uint8_t * buf_input)
     CopyBuf(TX_ARP_Resp, MAC_PC, 6);            // Replace MAC Destination 1
     CopyBuf(TX_ARP_Resp + 32, MAC_PC, 6);       // Replace MAC Destination 2
     CopyBuf(TX_ARP_Resp + 6, MAC_STM, 6);       // Replace STM32 MAC 
+    CopyBuf(TX_ARP_Resp + 22, MAC_STM, 6);      // Replace STM32 MAC
     
     CopyBuf(IP_PC, TX_ARP_Resp + 28, 4);        // Store IP Destination
     CopyBuf(TX_ARP_Resp + 38, IP_PC, 4);        // Replace IP Destination
@@ -261,6 +268,30 @@ void ETH_init(void)
   //--- software reset DMA ----
   ETH->DMABMR |= ETH_DMABMR_SR;
   
+    /*
+    1. Write to ETH_DMABMR to set STM32F76xxx and STM32F77xxx bus access parameters.
+
+    2. Write to the ETH_DMAIER register to mask unnecessary interrupt causes.
+
+    3. The software driver creates the transmit and receive descriptor lists. 
+    Then it writes to both the ETH_DMARDLAR and ETH_DMATDLAR registers, 
+    providing the DMA with the start address of each list.
+
+    4. Write to MAC Registers 1, 2, and 3 to choose the desired filtering options.
+
+    5. Write to the MAC ETH_MACCR register to configure and enable the transmit and
+    receive operating modes. The PS and DM bits are set based on the auto-negotiation
+    result (read from the PHY).
+
+    6. Write to the ETH_DMAOMR register to set bits 13 and 1 and start transmission and
+    reception.
+
+    7. The transmit and receive engines enter the running state and attempt to acquire
+    descriptors from the respective descriptor lists. The receive and transmit engines then
+    begin processing receive and transmit operations. The transmit and receive processes
+    are independent of each other and can be started or stopped separately.
+  */
+  
   //--- init parameters ETH and DMA
   ETH_InitTypeDef ETH_InitStructure;
   ETH_StructInit(&ETH_InitStructure);
@@ -278,11 +309,10 @@ void ETH_init(void)
   ETH_InitStructure.ETH_MulticastFramesFilter = ETH_MulticastFramesFilter_Perfect;
   ETH_InitStructure.ETH_UnicastFramesFilter = ETH_UnicastFramesFilter_Perfect;
   
-  //-- NEW --
-  ETH->MACFFR |= ETH_MACFFR_RA;  // Receive all
   //ETH->DMAOMR |= ETH_DMAOMR_RSF | ETH_DMAOMR_TSF; // store and forward
   //check this func (PHY)
   Value = ETH_Init(&ETH_InitStructure, PHY_ADDRESS);
+  
   set_rmii();
   ETH->MACCR = (ETH_MACCR_FES | ETH_MACCR_DM | ETH_MACCR_RD | ETH_MACCR_APCS); // RM - P.1821
 
@@ -293,7 +323,29 @@ void ETH_init(void)
   
   TxDscrTab[0].ControlBufferSize = 42;
   TxDscrTab[1].ControlBufferSize = 214;
+  
+  ///------ Interrupts init ----------
+  ETH->MACIMR &= ~(ETH_MACIMR_PMTIM | ETH_MACIMR_TSTIM);        // OFF Interrupts
+  ETH->DMAIER |= ETH_DMAIER_NISE | ETH_DMAIER_RIE;              // Receive Interrupt Enable
+  
+  NVIC_EnableIRQ(ETH_IRQn);
+  NVIC_SetPriority(ETH_IRQn, 5);
+  ///---------------------------------
    
+  ///--- Set MACs for STM32 ---
+  ETH->MACA0HR |= (MAC_STM[5] << 8) |   // Upper 4 bytes of MAC address
+                  (MAC_STM[4]); 
+  ETH->MACA0LR =  (MAC_STM[3] << 24) |  //The lower 2 bytes of the MAC address
+                  (MAC_STM[2] << 16) |
+                  (MAC_STM[1] << 8) |
+                  (MAC_STM[0]); 
+  // Disable Promiscuous Mode (to avoid receiving unnecessary packets)
+  ETH->MACFFR &= ~(ETH_MACFFR_PM);
+  ETH->MACFFR &= ~(ETH_MACFFR_RA); 
+  // receive only addressed packets, filtering broadcast
+  //ETH->MACFFR |= ETH_MACFFR_BFD;
+  //-------------------------------------------------
+  
   //--- ETH Enable
   ETH_Start();
   
@@ -308,10 +360,6 @@ void ETH_init(void)
 
 }
 #endif
-
-
-
-
 
 //---------------------------------------------------------------------------- 
 //---------------------------------------------------------------------------- 
@@ -507,6 +555,104 @@ void set_rmii(void)
 //---------------------------------------------------------------------------- 
 //---------------------------------------------------------------------------- 
 //---------------------------------------------------------------------------- 
+//----- E T H E R N E T  I N T E R R U P T S  H A N D L E R ------------------ 
+//---------------------------------------------------------------------------- 
+
+
+void ETH_IRQHandler(void)
+{
+    uint32_t status = ETH->DMASR; // Read status
+
+    // Check receive packegies (Receive Interrupt)
+    if (status & ETH_DMASR_RS)
+    {
+        ETH_HandleRxInterrupt();
+        ETH->DMASR = ETH_DMASR_RS; // reset flag 
+    }
+/*
+    // check end of transmit (Transmit Interrupt)
+    if (status & ETH_DMASR_TS)
+    {
+        ETH_HandleTxInterrupt();
+        ETH->DMASR = ETH_DMASR_TS; // reset flag 
+    }
+*/
+}
+
+
+//---------------------------------------------------------------------------- 
+//---------------------------------------------------------------------------- 
+//---------------------------------------------------------------------------- 
+
+void ETH_HandleRxInterrupt(void)
+{
+    uint8_t PackageType = ETH_HandleRxPkt(Tmp_Buf);
+    
+    if (PackageType > 0)
+    {
+        ETH_DMAReceptionCmd(DISABLE); // DISABLE Receive process
+
+        uint8_t resp = DefinePackage(Tmp_Buf);
+      if (resp == 1)
+        //--- if ARP ---
+        SendARPResponse(Tmp_Buf);
+      else if (resp == 2)
+        //--- if IP ---
+        ETH_transmit_pack();
+      else
+        //--- if Other ---
+        led_green_blink();
+
+        ETH_DMAReceptionCmd(ENABLE); // ???????? ????? ?????
+    }
+}
+
+
+//---------------------------------------------------------------------------- 
+//---------------------------------------------------------------------------- 
+//---------------------------------------------------------------------------- 
+/*
+void ETH_HandleTxInterrupt(void)
+{
+    // ?????????, ??? ???????? ?????????
+    if (!(TxDscrTab[0].Status & ETH_DMATxDesc_OWN))
+    {
+        // ?????????? ???? ????????
+        TxDscrTab[0].Status &= ~ETH_DMATxDesc_OWN;
+        
+        // ????????????? ????????, ???? ??????????
+        ETH->DMATPDR = 0;
+    }
+}
+*/
+//---------------------------------------------------------------------------- 
+//---------------------------------------------------------------------------- 
+//---------------------------------------------------------------------------- 
+
+//---------------------------------------------------------------------------- 
+//---------------------------------------------------------------------------- 
+//---------------------------------------------------------------------------- 
+
+//---------------------------------------------------------------------------- 
+//---------------------------------------------------------------------------- 
+//---------------------------------------------------------------------------- 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//---------------------------------------------------------------------------- 
+//---------------------------------------------------------------------------- 
+//---------------------------------------------------------------------------- 
 
 
 void Eth_init_old(void)
@@ -520,29 +666,7 @@ void Eth_init_old(void)
   RCC->AHB1RSTR|=RCC_AHB1RSTR_ETHMACRST;
   RCC->AHB1RSTR&=~RCC_AHB1RSTR_ETHMACRST;    
 
-  /*
-    1. Write to ETH_DMABMR to set STM32F76xxx and STM32F77xxx bus access parameters.
 
-    2. Write to the ETH_DMAIER register to mask unnecessary interrupt causes.
-
-    3. The software driver creates the transmit and receive descriptor lists. 
-    Then it writes to both the ETH_DMARDLAR and ETH_DMATDLAR registers, 
-    providing the DMA with the start address of each list.
-
-    4. Write to MAC Registers 1, 2, and 3 to choose the desired filtering options.
-
-    5. Write to the MAC ETH_MACCR register to configure and enable the transmit and
-    receive operating modes. The PS and DM bits are set based on the auto-negotiation
-    result (read from the PHY).
-
-    6. Write to the ETH_DMAOMR register to set bits 13 and 1 and start transmission and
-    reception.
-
-    7. The transmit and receive engines enter the running state and attempt to acquire
-    descriptors from the respective descriptor lists. The receive and transmit engines then
-    begin processing receive and transmit operations. The transmit and receive processes
-    are independent of each other and can be started or stopped separately.
-  */
   
   //---- Program reset
   ETH->DMABMR |= ETH_DMABMR_SR;

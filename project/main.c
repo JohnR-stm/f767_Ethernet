@@ -8,7 +8,7 @@
 
 #define BUF_SIZE 10
 
-#define B
+#define C
 
 char string1[] = "Hello, I'm STM32G070! \r\n";
 
@@ -69,10 +69,14 @@ int main(void)
       
       uint8_t resp = DefinePackage(Temp_Buf);
       if (resp == 1)
+        //--- if ARP ---
         SendARPResponse(Temp_Buf);
+      else if (resp == 2)
+        //--- if IP ---
+        ETH_transmit_pack();
       else
+        //--- if Other ---
         led_green_blink();
-        //ETH_transmit_pack(); 
    
       // if transmit process is stoped DISABLE Transmit and ENABLE Receive
       system_delay(4);
@@ -85,10 +89,18 @@ int main(void)
     
 #endif
     
+#ifdef C
+    
+    //led_green_blink();
+    system_delay(500);
+    
+#endif
+    
     /// send message ///
     //uart1_send_string(string1);
   }
 }
+
 
 //----------------------------------------------------------------------------
 //----------------------------------------------------------------------------
