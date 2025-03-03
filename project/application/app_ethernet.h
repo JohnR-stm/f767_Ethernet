@@ -19,6 +19,7 @@ void SendARPResponse(uint8_t * buf_input);
 void Set_MAC_Filter(void);
 
 void ETH_HandleRxInterrupt(void);
+void SendIPResponse(void);
 
 
 void ETH_transmit_pack(void);

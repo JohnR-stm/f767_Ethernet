@@ -1684,6 +1684,20 @@ uint32_t ETH_GetRxPktSize(ETH_DMADESCTypeDef *DMARxDesc)
   return frameLength;
 }
 
+//-----------------------------------------------------------------------------
+
+uint32_t ETH_HandleIsTxEmpty(void)
+{
+    /* Check if the descriptor is owned by the ETHERNET DMA (when set) or CPU (when reset) */
+  if((DMATxDescToSet->Status & ETH_DMATxDesc_OWN) != (uint32_t)RESET)
+  {
+    /* Return ERROR: OWN bit set */
+    return ETH_ERROR;
+  }
+}
+
+//-----------------------------------------------------------------------------
+
 /**
   * @brief  Transmits a packet, from application buffer, pointed by ppkt.
   * @param  ppkt: pointer to the application's packet buffer to transmit.
@@ -1691,6 +1705,7 @@ uint32_t ETH_GetRxPktSize(ETH_DMADESCTypeDef *DMARxDesc)
   * @retval ETH_ERROR: in case of Tx desc owned by DMA
   *         ETH_SUCCESS: for correct transmission
   */
+
 
 uint32_t ETH_HandleTxPkt(uint8_t *ppkt, uint16_t FrameLength)
 { 

@@ -1604,6 +1604,7 @@ FlagStatus ETH_GetSoftwareResetStatus(void);
 void  ETH_Start(void);
 uint32_t ETH_GetRxPktSize(ETH_DMADESCTypeDef *DMARxDesc);
 
+uint32_t ETH_HandleIsTxEmpty(void);
 uint32_t ETH_HandleTxPkt(u8 *ppkt, u16 FrameLength);
 uint32_t ETH_HandleRxPkt(uint8_t *ppkt);
 

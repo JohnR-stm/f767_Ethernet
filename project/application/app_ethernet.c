@@ -34,6 +34,11 @@
 
 //--------------------------------------------------
 
+#define SPECTRUM_BUFFER_SIZE    1500
+#define NUM_OF_SPECT_BUFERS     50
+
+//--------------------------------------------------
+
 uint16_t phy_status = 0;
 
 uint32_t Value = 0;
@@ -117,6 +122,69 @@ uint8_t IP_STM[4] = {192,  168,  100,   157};
 uint8_t TX_ARP_Resp[42] = {0};
 
 
+//#define SPECTRUM_BUFFER_SIZE    1500
+//#define NUM_OF_SPECT_BUFERS     50
+//----- SPECTRUM BUFFER ARRAYS -----------------------------------------------
+__attribute__((aligned(4))) uint8_t SPECTRUM[NUM_OF_SPECT_BUFERS][SPECTRUM_BUFFER_SIZE] = {0};
+  
+//---------------------------------------------------------------------------- 
+
+void send_spectrum_buffer(void)
+{
+  uint16_t Temp = 0;
+  for(uint16_t buffers = 0; buffers < NUM_OF_SPECT_BUFERS; buffers++)
+  {
+    //--- store technical information ---
+    CopyBuf(&SPECTRUM[buffers][0], MAC_PC, 6);
+    CopyBuf(&SPECTRUM[buffers][6], MAC_STM, 6);
+    SPECTRUM[buffers][12] = 0x08;
+    SPECTRUM[buffers][13] = 0x00;
+    //--- IP ---- [14] - [25]
+    SPECTRUM[buffers][14] = 0x45;   // version + IHL
+    SPECTRUM[buffers][15] = 0x00;   // TOS
+    SPECTRUM[buffers][16] = 0x00;   // Length 1
+    SPECTRUM[buffers][17] = 0x58;   // Length 2
+    SPECTRUM[buffers][18] = 0x00;   // ID package 1 
+    SPECTRUM[buffers][19] = 0x01;   // ID Package 2
+    SPECTRUM[buffers][20] = 0x00;   // flags / offset fragment
+    SPECTRUM[buffers][21] = 0x00;   // offset fragment
+    SPECTRUM[buffers][22] = 0x05;   // TTL (Time to live)
+    SPECTRUM[buffers][23] = 0x11;   // UDP
+    SPECTRUM[buffers][24] = 0x00;   // Checksum 1
+    SPECTRUM[buffers][25] = 0x00;   // Checksum 2
+    CopyBuf(&SPECTRUM[buffers][26], IP_STM, 4);     // IP source
+    CopyBuf(&SPECTRUM[buffers][30], IP_PC, 4);      // IP dest
+    //--- UDP ----
+    SPECTRUM[buffers][34] = 0x11;   // Port sourse 1
+    SPECTRUM[buffers][35] = 0x11;   // Port sourse 2
+    SPECTRUM[buffers][36] = 0x33;   // Port dest 1
+    SPECTRUM[buffers][37] = 0x33;   // Port dest 2
+    SPECTRUM[buffers][38] = 0x05;   // UDP len 1
+    SPECTRUM[buffers][39] = 0xBA;   // UDP len 2
+    SPECTRUM[buffers][40] = 0x00;   // Checksum UDP 1
+    SPECTRUM[buffers][41] = 0x00;   // Checksum UDP 2
+    
+    SPECTRUM[buffers][42] = (uint8_t)buffers;
+    //--- store data information --------
+    for(uint16_t values = 43; values < SPECTRUM_BUFFER_SIZE; values += 2)
+    {
+      Temp = values - 43 + buffers*200; 
+      SPECTRUM[buffers][values] = (uint8_t) ((Temp>>8) & 0xFF);
+      SPECTRUM[buffers][values + 1] = (uint8_t) (Temp & 0xFF);
+    }
+  }
+  
+  // Sending reply
+  for(uint8_t buffers = 0; buffers < NUM_OF_SPECT_BUFERS; buffers++)
+  {
+    ETH_DMATransmissionCmd(DISABLE);
+    while(ETH_HandleIsTxEmpty() == ETH_ERROR) { };
+    ETH_HandleTxPkt(&SPECTRUM[buffers][0], SPECTRUM_BUFFER_SIZE);
+    ETH_DMATransmissionCmd(ENABLE);
+  }
+
+}
+
 //---------------------------------------------------------------------------- 
 //---------------------------------------------------------------------------- 
 //----------------------------------------------------------------------------
@@ -173,13 +241,13 @@ uint8_t DefinePackage(uint8_t * buf_input)
   if ( (buf_input[12] == 0x08) &&
        (buf_input[13] == 0x06) &&
        (buf_input[21] == 0x01) )        // ARP
-  {
+    {
     if ( buf_input[38] == IP_STM[0] &&
          buf_input[39] == IP_STM[1] &&
          buf_input[40] == IP_STM[2] &&
          buf_input[41] == IP_STM[3] )
       return 1;
-  }  
+    }  
   else
    if ( (buf_input[0] == MAC_STM[0]) &&
         (buf_input[1] == MAC_STM[1]) &&
@@ -187,11 +255,17 @@ uint8_t DefinePackage(uint8_t * buf_input)
         (buf_input[3] == MAC_STM[3]) &&
         (buf_input[4] == MAC_STM[4]) &&
         (buf_input[5] == MAC_STM[5]) )      
-  {
-    if ( buf_input[12] == 0x08 &&
-         buf_input[13] == 0x00)         // IP
-      return 2;
-  }
+    {
+      if ( buf_input[12] == 0x08 &&
+           buf_input[13] == 0x00)         // IP
+      {
+        if (buf_input[42] == 0xAA)
+          return 3;
+        else
+          return 2; 
+      }
+      
+    }
   return 0;
 }
 
@@ -220,6 +294,53 @@ void SendARPResponse(uint8_t * buf_input)
     ETH_DMATransmissionCmd(DISABLE);
     ETH_HandleTxPkt(&TX_ARP_Resp[0], 42);
     ETH_DMATransmissionCmd(ENABLE);
+}
+
+
+//---------------------------------------------------------------------------- 
+//---------------------------------------------------------------------------- 
+//----------------------------------------------------------------------------
+
+void SendIPResponse(void) 
+{
+  uint8_t IP_PACK[102] = {0};
+  //--- Ethernet -----
+  CopyBuf(IP_PACK, MAC_PC, 6);
+  CopyBuf(IP_PACK + 6, MAC_STM, 6);
+  IP_PACK[12] = 0x08;
+  IP_PACK[13] = 0x00;
+  //--- IP ---- [14] - [25]
+  IP_PACK[14] = 0x45;   // version + IHL
+  IP_PACK[15] = 0x00;   // TOS
+  IP_PACK[16] = 0x00;   // Length 1
+  IP_PACK[17] = 0x58;   // Length 2
+  IP_PACK[18] = 0x00;   // ID package 1 
+  IP_PACK[19] = 0x01;   // ID Package 2
+  IP_PACK[20] = 0x00;   // flags / offset fragment
+  IP_PACK[21] = 0x00;   // offset fragment
+  IP_PACK[22] = 0x05;   // TTL (Time to live)
+  IP_PACK[23] = 0x11;   // UDP
+  IP_PACK[24] = 0x00;   // Checksum 1
+  IP_PACK[25] = 0x00;   // Checksum 2
+  CopyBuf(IP_PACK + 26, IP_STM, 4);     // IP source
+  CopyBuf(IP_PACK + 30, IP_PC, 4);      // IP dest
+  //--- UDP ----
+  IP_PACK[34] = 0x11;   // Port sourse 1
+  IP_PACK[35] = 0x11;   // Port sourse 2
+  IP_PACK[36] = 0x33;   // Port dest 1
+  IP_PACK[37] = 0x33;   // Port dest 2
+  IP_PACK[38] = 0x00;   // UDP len 1
+  IP_PACK[39] = 0x44;   // UDP len 2
+  IP_PACK[40] = 0x00;   // Checksum UDP 1
+  IP_PACK[41] = 0x00;   // Checksum UDP 2
+  //--- DATA ---
+  for (uint8_t cnt = 0; cnt < (102 - 42); cnt++)
+    IP_PACK[cnt + 42] = cnt;
+  
+    // Sending IP Pack
+  ETH_DMATransmissionCmd(DISABLE);
+  ETH_HandleTxPkt(&IP_PACK[0], 102);
+  ETH_DMATransmissionCmd(ENABLE);
 }
 
 //---------------------------------------------------------------------------- 
@@ -340,8 +461,8 @@ void ETH_init(void)
                   (MAC_STM[1] << 8) |
                   (MAC_STM[0]); 
   // Disable Promiscuous Mode (to avoid receiving unnecessary packets)
-  ETH->MACFFR &= ~(ETH_MACFFR_PM);
-  ETH->MACFFR &= ~(ETH_MACFFR_RA); 
+  //ETH->MACFFR &= ~(ETH_MACFFR_PM);
+  //ETH->MACFFR &= ~(ETH_MACFFR_RA); 
   // receive only addressed packets, filtering broadcast
   //ETH->MACFFR |= ETH_MACFFR_BFD;
   //-------------------------------------------------
@@ -588,7 +709,7 @@ void ETH_HandleRxInterrupt(void)
 {
     uint8_t PackageType = ETH_HandleRxPkt(Tmp_Buf);
     
-    if (PackageType > 0)
+    while (PackageType > 0)
     {
         ETH_DMAReceptionCmd(DISABLE); // DISABLE Receive process
 
@@ -598,13 +719,18 @@ void ETH_HandleRxInterrupt(void)
         SendARPResponse(Tmp_Buf);
       else if (resp == 2)
         //--- if IP ---
-        ETH_transmit_pack();
-      else
+        SendIPResponse();
+      else if (resp == 3)
+        send_spectrum_buffer();
+      else 
         //--- if Other ---
         led_green_blink();
+      
+      PackageType = ETH_HandleRxPkt(Tmp_Buf);
 
-        ETH_DMAReceptionCmd(ENABLE); // ???????? ????? ?????
     }
+    
+    ETH_DMAReceptionCmd(ENABLE); // ???????? ????? ?????
 }
 
 
