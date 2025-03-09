@@ -358,6 +358,7 @@
                     <state>$PROJ_DIR$\..\project\mdl</state>
                     <state>$PROJ_DIR$\..\project\mdl\stm32</state>
                     <state>$PROJ_DIR$\..\project\mdl\stm32\uart</state>
+                    <state>$PROJ_DIR$\..\project\mdl\submod</state>
                     <state>$PROJ_DIR$\..\project\mdl\stm32\led</state>
                     <state>$PROJ_DIR$\..\project\Ethernet</state>
                     <state>$PROJ_DIR$\..\project\mdl_config</state>
@@ -2224,6 +2225,15 @@
                     <name>$PROJ_DIR$\..\project\mdl\stm32\led\led_hw.h</name>
                 </file>
             </group>
+            <group>
+                <name>spi</name>
+                <file>
+                    <name>$PROJ_DIR$\..\project\mdl\submod\spi_hw.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\project\mdl\submod\spi_hw.h</name>
+                </file>
+            </group>
         </group>
     </group>
     <group>
@@ -2276,6 +2286,12 @@
                 <name>$PROJ_DIR$\..\project\ST\ll\stm32f7xx_ll_cortex.h</name>
             </file>
             <file>
+                <name>$PROJ_DIR$\..\project\ST\ll\stm32f7xx_ll_dma.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\project\ST\ll\stm32f7xx_ll_dma.h</name>
+            </file>
+            <file>
                 <name>$PROJ_DIR$\..\project\ST\ll\stm32f7xx_ll_exti.c</name>
             </file>
             <file>
@@ -2295,6 +2311,12 @@
             </file>
             <file>
                 <name>$PROJ_DIR$\..\project\ST\ll\stm32f7xx_ll_rcc.h</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\project\ST\ll\stm32f7xx_ll_spi.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\project\ST\ll\stm32f7xx_ll_spi.h</name>
             </file>
             <file>
                 <name>$PROJ_DIR$\..\project\ST\ll\stm32f7xx_ll_system.h</name>

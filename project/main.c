@@ -5,6 +5,7 @@
 
 #include "stm32_eth.h"
 #include "app_ethernet.h"
+#include "spi_hw.h"
 
 #define BUF_SIZE 10
 
@@ -32,12 +33,20 @@ int main(void)
   leds_init();
   //uart_init_all();
   
+  __disable_irq ();
+  
   //--- ETHERNET ---
   ETH_fill_buffer();
   ETH_pins_init();
   ETH_init();
   
+  //--- SPI4 ----
+  spi_init_all();
+  start_dma_spi();
+  
   uint8_t PackageType = 0; //ReadBufRx();
+  
+  __enable_irq (); 
 
   
   while (1)

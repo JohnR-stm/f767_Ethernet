@@ -1694,6 +1694,7 @@ uint32_t ETH_HandleIsTxEmpty(void)
     /* Return ERROR: OWN bit set */
     return ETH_ERROR;
   }
+  return ETH_SUCCESS;
 }
 
 //-----------------------------------------------------------------------------

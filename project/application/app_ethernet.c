@@ -11,10 +11,13 @@
 #include "stm32f767xx.h"
 
 #include "led_hw.h"
+#include "spi_hw.h"
 
 #define PHY_ADDRESS     0x0
 
 #define SPEC_BUF_SIZE   4
+
+
 
 //------ DEFINES -----------------------------------
 
@@ -37,12 +40,19 @@
 #define SPECTRUM_BUFFER_SIZE    1500
 #define NUM_OF_SPECT_BUFERS     50
 
+
+#define CCD_SZ                  ((uint16_t)3650)
+#define CCD_SZx2                ((uint16_t) (CCD_SZ * 2))
+
 //--------------------------------------------------
 
 uint16_t phy_status = 0;
 
 uint32_t Value = 0;
 
+uint8_t spi_flag = 0;
+
+uint16_t Buf_SPI[CCD_SZ] = {0};
 
 
 #pragma data_alignment=4
@@ -160,7 +170,7 @@ void send_spectrum_buffer(void)
     SPECTRUM[buffers][36] = 0x33;   // Port dest 1
     SPECTRUM[buffers][37] = 0x33;   // Port dest 2
     SPECTRUM[buffers][38] = 0x05;   // UDP len 1
-    SPECTRUM[buffers][39] = 0xBA;   // UDP len 2
+    SPECTRUM[buffers][39] = 0xB2;   // UDP len 2
     SPECTRUM[buffers][40] = 0x00;   // Checksum UDP 1
     SPECTRUM[buffers][41] = 0x00;   // Checksum UDP 2
     
@@ -168,11 +178,19 @@ void send_spectrum_buffer(void)
     //--- store data information --------
     for(uint16_t values = 43; values < SPECTRUM_BUFFER_SIZE; values += 2)
     {
+      /*
       Temp = values - 43 + buffers*200; 
       SPECTRUM[buffers][values] = (uint8_t) ((Temp>>8) & 0xFF);
       SPECTRUM[buffers][values + 1] = (uint8_t) (Temp & 0xFF);
+      */
+      SPECTRUM[buffers][values] = 0;
+      SPECTRUM[buffers][values + 1] = 0;
     }
   }
+  
+  // SSD1 Buffers  
+  if (spi_flag == 1)
+    Pack_processing();
   
   // Sending reply
   for(uint8_t buffers = 0; buffers < NUM_OF_SPECT_BUFERS; buffers++)
@@ -751,9 +769,68 @@ void ETH_HandleTxInterrupt(void)
     }
 }
 */
+
+
+
+
+
 //---------------------------------------------------------------------------- 
 //---------------------------------------------------------------------------- 
 //---------------------------------------------------------------------------- 
+
+//---------------------------------------------------------------------------- 
+//---------------------------------------------------------------------------- 
+//---------------------------------------------------------------------------- 
+///---- S P I   D M A -------///
+//---------------------------------------------------------------------------- 
+//---------------------------------------------------------------------------- 
+//---------------------------------------------------------------------------- 
+
+//-----------------------------------------------------------------------------
+// START SPI DMA 
+//-----------------------------------------------------------------------------
+
+void start_dma_spi(void)
+{
+  spi_dma_buf ((uint32_t *)&Buf_SPI[0], CCD_SZ);
+}
+
+//-----------------------------------------------------------------------------
+//  SPI4 HANDLER
+//-----------------------------------------------------------------------------
+
+void spi_handler(void)
+{
+  spi_flag = 1;
+  // start_dma_spi();
+}
+
+//-----------------------------------------------------------------------------
+//  SPI Package processing
+//-----------------------------------------------------------------------------
+
+/// if (spi_flag == 1):
+void Pack_processing(void)
+{
+  ///--- Buffer processing ----///
+  ///--- CCD 1 ----------------///
+  uint16_t nm=0;
+  for(uint16_t buffers = 0; buffers < 5; buffers++)
+  {
+    //--- store num of buffer ---
+    SPECTRUM[buffers][42] = (uint8_t)buffers;
+    //--- store data information --------
+    for(uint16_t values=43; values < SPECTRUM_BUFFER_SIZE; values += 2)
+    {
+      SPECTRUM[buffers][values] = (uint8_t) ((Buf_SPI[nm]>>8) & 0xFF);
+      SPECTRUM[buffers][values + 1] = (uint8_t) (Buf_SPI[nm] & 0xFF);
+      nm++;
+    }
+  }
+  ///--- Restart SPI DMA ---///
+  spi_flag = 0;
+  start_dma_spi();
+}
 
 //---------------------------------------------------------------------------- 
 //---------------------------------------------------------------------------- 
@@ -763,10 +840,9 @@ void ETH_HandleTxInterrupt(void)
 //---------------------------------------------------------------------------- 
 //---------------------------------------------------------------------------- 
 
-
-
-
-
+//---------------------------------------------------------------------------- 
+//---------------------------------------------------------------------------- 
+//---------------------------------------------------------------------------- 
 
 
 
