@@ -33,8 +33,9 @@
 #endif /* STM32F7 */
 
 
-#include "spi_hw.h"
+#include "spi_hw_app.h"
 
+#include "system_init.h"
 //-----------------------------------------------------------------------------
 
 static void spi_pins_init(void);
@@ -49,6 +50,17 @@ void set_SPI_buf_len (uint32_t data_len);
 void set_SPI_buf_addr (uint32_t * addr);
 
 
+
+#define CMD_LED_ON  0x0A01
+#define CMD_LED_OFF 0x0A02
+#define CMD_TRANSFER_DATA ((uint16_t)(0x0103))
+
+uint16_t spi_tx_buffer[1] = {0x0103};
+uint16_t spi_rx_buffer[1];
+
+uint16_t Buf_SPI[CCD_SZ] = {0};
+
+uint8_t receive_spec_resp = 0;
 
 //-----------------------------------------------------------------------------
 
@@ -100,23 +112,29 @@ static void spi_port_init(void)
   
   //--- SPI4  configuration ---//
   LL_SPI_InitTypeDef SPI_InitStruct = {0};
-  SPI_InitStruct.TransferDirection = LL_SPI_SIMPLEX_RX;         // SPIx->CR1 -- RX Only
-  SPI_InitStruct.Mode = LL_SPI_MODE_SLAVE;                      // Slave no (MSTR | SSI)
+  SPI_InitStruct.TransferDirection = LL_SPI_FULL_DUPLEX;        // Change !!! LL_SPI_SIMPLEX_RX;         // SPIx->CR1 -- RX Only
+  SPI_InitStruct.Mode =LL_SPI_MODE_MASTER;                      // Change !!! LL_SPI_MODE_SLAVE; // Slave no (MSTR | SSI)
   SPI_InitStruct.DataWidth = LL_SPI_DATAWIDTH_16BIT;            // Data - 16 bit (CR2 DS)
   SPI_InitStruct.ClockPolarity = LL_SPI_POLARITY_LOW;
   SPI_InitStruct.ClockPhase = LL_SPI_PHASE_1EDGE;
   SPI_InitStruct.NSS = LL_SPI_NSS_SOFT;                         // SS not used
-  SPI_InitStruct.BaudRate = LL_SPI_BAUDRATEPRESCALER_DIV4;      //  8 Mhz               LL_SPI_BAUDRATEPRESCALER_DIV4;
+  SPI_InitStruct.BaudRate = LL_SPI_BAUDRATEPRESCALER_DIV16;      //  8 ??? Mhz               LL_SPI_BAUDRATEPRESCALER_DIV4;
   SPI_InitStruct.BitOrder = LL_SPI_MSB_FIRST;
   SPI_InitStruct.CRCCalculation = LL_SPI_CRCCALCULATION_DISABLE;// NO CRC
   SPI_InitStruct.CRCPoly = 7;
   LL_SPI_Init(SPI4, &SPI_InitStruct);
-  LL_SPI_SetStandard(SPI4, LL_SPI_PROTOCOL_MOTOROLA);           // CR2, SPI_CR2_FRF
-  //LL_SPI_EnableNSSPulseMgt(SPI4);                               // CR2, SPI_CR2_NSSP (Only in Master Mode)
+  LL_SPI_SetStandard(SPI4, LL_SPI_PROTOCOL_MOTOROLA);                   // CR2, SPI_CR2_FRF
+  LL_SPI_EnableNSSPulseMgt(SPI4);                               // CR2, SPI_CR2_NSSP (Only in Master Mode)
+  
+  //--- SPI Interrupts Enable ---//
+  //LL_SPI_SetRxFIFOThreshold(SPI4, LL_SPI_RX_FIFO_TH_HALF);              // !!! New Change
+  //LL_SPI_EnableIT_TXE(SPI4);                                            // !!! New Change
+  //NVIC_SetPriority(SPI4_IRQn, NVIC_EncodePriority(NVIC_GetPriorityGrouping(),4, 0)); 
+  //NVIC_EnableIRQ(SPI4_IRQn);
   
   //--- DMA RX Enable ---//
   //LL_SPI_EnableDMAReq_TX(SPI4);
-  LL_SPI_EnableDMAReq_RX(SPI4);
+  //LL_SPI_EnableDMAReq_RX(SPI4);
   //--- SPI 4 Enable ---//
   LL_SPI_Enable(SPI4);
 }
@@ -134,12 +152,25 @@ static void spi_dma_init(void)
     
   LL_DMA_SetDataTransferDirection(DMA2, LL_DMA_STREAM_0, LL_DMA_DIRECTION_PERIPH_TO_MEMORY);   // From SPI to Buf
   LL_DMA_SetStreamPriorityLevel(DMA2, LL_DMA_STREAM_0, LL_DMA_PRIORITY_MEDIUM);
-  LL_DMA_SetMode(DMA2, LL_DMA_STREAM_0, LL_DMA_MODE_CIRCULAR);                                 // Circular
+  LL_DMA_SetMode(DMA2, LL_DMA_STREAM_0, LL_DMA_MODE_NORMAL);                                 // Circular LL_DMA_MODE_CIRCULAR 
   LL_DMA_SetPeriphIncMode(DMA2, LL_DMA_STREAM_0, LL_DMA_PERIPH_NOINCREMENT);
   LL_DMA_SetMemoryIncMode(DMA2, LL_DMA_STREAM_0, LL_DMA_MEMORY_INCREMENT);
   LL_DMA_SetPeriphSize(DMA2, LL_DMA_STREAM_0, LL_DMA_PDATAALIGN_HALFWORD);
   LL_DMA_SetMemorySize(DMA2, LL_DMA_STREAM_0, LL_DMA_MDATAALIGN_HALFWORD);
   LL_DMA_SetChannelSelection(DMA2, LL_DMA_STREAM_0, LL_DMA_CHANNEL_4);
+  
+  
+  //// DMA Tramsmit 
+  
+  LL_DMA_SetDataTransferDirection(DMA2, LL_DMA_STREAM_1, LL_DMA_DIRECTION_MEMORY_TO_PERIPH);   // From Buf  to SPI 
+  LL_DMA_SetStreamPriorityLevel(DMA2, LL_DMA_STREAM_1, LL_DMA_PRIORITY_MEDIUM);
+  LL_DMA_SetMode(DMA2, LL_DMA_STREAM_1, LL_DMA_MODE_NORMAL);                                 // Circular LL_DMA_MODE_CIRCULAR 
+  LL_DMA_SetPeriphIncMode(DMA2, LL_DMA_STREAM_1, LL_DMA_PERIPH_NOINCREMENT);
+  LL_DMA_SetMemoryIncMode(DMA2, LL_DMA_STREAM_1, LL_DMA_MEMORY_INCREMENT);
+  LL_DMA_SetPeriphSize(DMA2, LL_DMA_STREAM_1, LL_DMA_PDATAALIGN_HALFWORD);
+  LL_DMA_SetMemorySize(DMA2, LL_DMA_STREAM_1, LL_DMA_MDATAALIGN_HALFWORD);
+  LL_DMA_SetChannelSelection(DMA2, LL_DMA_STREAM_1, LL_DMA_CHANNEL_4);
+  
   
   //DMA1_Channel1->CCR = 0;
   
@@ -188,34 +219,73 @@ inline void set_SPI_buf_addr (uint32_t * addr)
 }
 
 //------------------------------------------------------------------------------
-// DMA Buffer 
+// DMA Buffer RX
 
 void spi_dma_buf (uint32_t * addr, uint32_t data_len)
 {
   LL_DMA_DisableStream(DMA2, LL_DMA_STREAM_0);
   
+  set_SPI_addr ();
+  set_SPI_buf_len (data_len);
+  set_SPI_buf_addr (addr);
+  
   LL_SPI_EnableDMAReq_RX(SPI4);
+  
+  LL_DMA_EnableStream(DMA2, LL_DMA_STREAM_0);
+}
+
+//------------------------------------------------------------------------------
+// DMA Buffer TX
+
+void spi_dma_TX (uint32_t * addr, uint32_t data_len)
+{
+  LL_DMA_DisableStream(DMA2, LL_DMA_STREAM_1);
   
   set_SPI_addr ();
   set_SPI_buf_len (data_len);
   set_SPI_buf_addr (addr);
   
-  LL_DMA_EnableStream(DMA2, LL_DMA_STREAM_0);
+  LL_SPI_EnableDMAReq_TX(SPI4);
+  
+  LL_DMA_EnableStream(DMA2, LL_DMA_STREAM_1);
 }
 
 
-
-
-
 //------------------------------------------------------------------------------
 
+void get_spectrum_response(void)
+{
+ 
+  SPI4->CR1 &= ~LL_SPI_SIMPLEX_RX;
+  LL_SPI_Enable(SPI4);
+  
+  //-- send resp to STM32f302 by SPI --//
+  //spi_dma_TX ((uint32_t *)&spi_tx_buffer[0], 1);
+  
+  while (!LL_SPI_IsActiveFlag_TXE(SPI4));  // ???? ?????????? SPI
+  LL_SPI_TransmitData16(SPI4, CMD_TRANSFER_DATA);
+  system_delay(2);
+ 
+  //LL_DMA_DisableStream(DMA2, LL_DMA_STREAM_1);
+  //LL_SPI_DisableDMAReq_TX(SPI4);
+
+  //--- OFF SPI ---///
+  LL_SPI_Disable(SPI4);
+  //--- Receive only SPI--//
+  SPI4->CR1 |= LL_SPI_SIMPLEX_RX;
+  //--- Enable SPI ---///
+  LL_SPI_Enable(SPI4);
+  //--- Start DMA Receive ONLY ---///
+  spi_dma_buf ((uint32_t *)&Buf_SPI[0], CCD_SZ);
+}
 
 //------------------------------------------------------------------------------
-// INTERRUPT
+// INTERRUPTS
 //------------------------------------------------------------------------------
 
 void DMA2_Stream0_IRQHandler(void) // in spi.c, in config
 {
+  //---- IF transfer complete ---//
   if(LL_DMA_IsActiveFlag_TC0(DMA2))     // DMA2 Stream0
   {
     LL_DMA_ClearFlag_TC0(DMA2);
@@ -230,13 +300,58 @@ void DMA2_Stream0_IRQHandler(void) // in spi.c, in config
     LL_DMA_ClearFlag_HT0(DMA2);
     LL_DMA_ClearFlag_TE0(DMA2);  // Transfer error
   }   
-  spi_handler(); // Extern function
+  //spi_handler(); // Extern function --- if transfer complete
+  LL_DMA_DisableStream(DMA2, LL_DMA_STREAM_0);
+    //--- OFF SPI ---///
+  LL_SPI_Disable(SPI4);
+  LL_SPI_DisableDMAReq_RX(SPI4);
+  
+  send_spectrum_buffer(); // Extern function --- if transfer complete
+ 
+
+  //--- Full Duplex SPI--//
+  //SPI4->CR1 &= ~LL_SPI_SIMPLEX_RX;
+  
+  //--- Enable SPI ---///
+  //LL_SPI_Enable(SPI4);
+  
+ 
 }
 
 
 //-----------------------------------------------------------------------------
 
+void DMA2_Stream1_IRQHandler(void) 
+{
+    if(LL_DMA_IsActiveFlag_TC1(DMA2)) 
+    {
+        LL_DMA_ClearFlag_TC1(DMA2);
+        LL_DMA_DisableStream(DMA2, LL_DMA_STREAM_1);
+        LL_SPI_DisableDMAReq_TX(SPI4);
 
+        // Disable SPI
+        LL_SPI_Disable(SPI4); 
+    }
+}
+
+
+//-----------------------------------------------------------------------------
+
+/*
+void SPI4_IRQHandler(void)
+{       //--- if TX is complete ---//
+  if (LL_SPI_IsActiveFlag_TXE(SPI4)) 
+  {
+    LL_SPI_ReceiveData16(SPI4);
+    if (receive_spec_resp == 1)
+    {
+      receive_spec_resp = 0;
+      //-- enable DMA receive --//
+      spi_dma_buf ((uint32_t *)&Buf_SPI[0], CCD_SZ);
+    }
+  }
+}
+*/
 
 //-----------------------------------------------------------------------------
 //

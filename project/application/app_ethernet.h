@@ -35,7 +35,7 @@ void Eth_init_old(void);
 //---------------------------------------------------------------------------- 
 //---------------------------------------------------------------------------- 
 
-void start_dma_spi(void);
+//void start_dma_spi(void);
 void spi_handler(void);
 void Pack_processing(void);
 

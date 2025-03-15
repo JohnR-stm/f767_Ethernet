@@ -11,7 +11,7 @@
 #include "stm32f767xx.h"
 
 #include "led_hw.h"
-#include "spi_hw.h"
+#include "spi_hw_app.h"
 
 #define PHY_ADDRESS     0x0
 
@@ -41,8 +41,7 @@
 #define NUM_OF_SPECT_BUFERS     50
 
 
-#define CCD_SZ                  ((uint16_t)3650)
-#define CCD_SZx2                ((uint16_t) (CCD_SZ * 2))
+
 
 //--------------------------------------------------
 
@@ -52,7 +51,7 @@ uint32_t Value = 0;
 
 uint8_t spi_flag = 0;
 
-uint16_t Buf_SPI[CCD_SZ] = {0};
+extern uint16_t Buf_SPI[CCD_SZ];
 
 
 #pragma data_alignment=4
@@ -189,8 +188,8 @@ void send_spectrum_buffer(void)
   }
   
   // SSD1 Buffers  
-  if (spi_flag == 1)
-    Pack_processing();
+  ///if (spi_flag == 1)
+  Pack_processing();
   
   // Sending reply
   for(uint8_t buffers = 0; buffers < NUM_OF_SPECT_BUFERS; buffers++)
@@ -739,16 +738,18 @@ void ETH_HandleRxInterrupt(void)
         //--- if IP ---
         SendIPResponse();
       else if (resp == 3)
-        send_spectrum_buffer();
+        //--- if IP - Spectrum Response ---//
+        get_spectrum_response();
+        //send_spectrum_buffer();
       else 
         //--- if Other ---
         led_green_blink();
       
+      
       PackageType = ETH_HandleRxPkt(Tmp_Buf);
-
     }
     
-    ETH_DMAReceptionCmd(ENABLE); // ???????? ????? ?????
+    ETH_DMAReceptionCmd(ENABLE); // ENABLE Receive process
 }
 
 
@@ -789,11 +790,12 @@ void ETH_HandleTxInterrupt(void)
 //-----------------------------------------------------------------------------
 // START SPI DMA 
 //-----------------------------------------------------------------------------
-
+/*
 void start_dma_spi(void)
 {
   spi_dma_buf ((uint32_t *)&Buf_SPI[0], CCD_SZ);
 }
+*/
 
 //-----------------------------------------------------------------------------
 //  SPI4 HANDLER
@@ -828,8 +830,8 @@ void Pack_processing(void)
     }
   }
   ///--- Restart SPI DMA ---///
-  spi_flag = 0;
-  start_dma_spi();
+  //spi_flag = 0;
+  //start_dma_spi();
 }
 
 //---------------------------------------------------------------------------- 

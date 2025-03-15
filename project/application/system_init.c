@@ -28,7 +28,7 @@ void system_clock_config(void)
   LL_RCC_HSE_EnableCSS();
   
   //--- PLL ---//
-  LL_RCC_PLL_ConfigDomain_SYS(LL_RCC_PLLSOURCE_HSE, LL_RCC_PLLM_DIV_4, 100, LL_RCC_PLLP_DIV_2);
+  LL_RCC_PLL_ConfigDomain_SYS(LL_RCC_PLLSOURCE_HSE, LL_RCC_PLLM_DIV_4, 128, LL_RCC_PLLP_DIV_2);
   LL_RCC_PLL_Enable();
   //--- Wait till PLL is ready ---//
   while(LL_RCC_PLL_IsReady() != 1)

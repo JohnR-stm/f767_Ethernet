@@ -5,11 +5,11 @@
 
 #include "stm32_eth.h"
 #include "app_ethernet.h"
-#include "spi_hw.h"
+#include "spi_hw_app.h"
 
 #define BUF_SIZE 10
 
-#define C
+#define Ca
 
 char string1[] = "Hello, I'm STM32G070! \r\n";
 
@@ -42,7 +42,7 @@ int main(void)
   
   //--- SPI4 ----
   spi_init_all();
-  start_dma_spi();
+  //start_dma_spi();
   
   uint8_t PackageType = 0; //ReadBufRx();
   

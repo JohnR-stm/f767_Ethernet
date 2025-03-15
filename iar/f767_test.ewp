@@ -675,7 +675,7 @@
                 </option>
                 <option>
                     <name>OOCOutputFile</name>
-                    <state></state>
+                    <state>f767_test.srec</state>
                 </option>
                 <option>
                     <name>OOCCommandLineProducer</name>
@@ -2225,15 +2225,15 @@
                     <name>$PROJ_DIR$\..\project\mdl\stm32\led\led_hw.h</name>
                 </file>
             </group>
-            <group>
-                <name>spi</name>
-                <file>
-                    <name>$PROJ_DIR$\..\project\mdl\submod\spi_hw.c</name>
-                </file>
-                <file>
-                    <name>$PROJ_DIR$\..\project\mdl\submod\spi_hw.h</name>
-                </file>
-            </group>
+        </group>
+        <group>
+            <name>submod</name>
+            <file>
+                <name>$PROJ_DIR$\..\project\mdl\submod\spi_hw_app.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\project\mdl\submod\spi_hw_app.h</name>
+            </file>
         </group>
     </group>
     <group>
