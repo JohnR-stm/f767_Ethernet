@@ -6,6 +6,7 @@
 #include "stm32_eth.h"
 #include "app_ethernet.h"
 #include "spi_hw_app.h"
+#include "tim_hw_app.h"
 
 #define BUF_SIZE 10
 
@@ -44,7 +45,11 @@ int main(void)
   spi_init_all();
   //start_dma_spi();
   
-  uint8_t PackageType = 0; //ReadBufRx();
+  //--- Timers ----
+  ccd_timers_init();
+  ccd_timers_start();
+  
+  //uint8_t PackageType = 0; //ReadBufRx();
   
   __enable_irq (); 
 

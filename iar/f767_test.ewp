@@ -2234,6 +2234,12 @@
             <file>
                 <name>$PROJ_DIR$\..\project\mdl\submod\spi_hw_app.h</name>
             </file>
+            <file>
+                <name>$PROJ_DIR$\..\project\mdl\submod\tim_hw_app.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\project\mdl\submod\tim_hw_app.h</name>
+            </file>
         </group>
     </group>
     <group>
@@ -2320,6 +2326,12 @@
             </file>
             <file>
                 <name>$PROJ_DIR$\..\project\ST\ll\stm32f7xx_ll_system.h</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\project\ST\ll\stm32f7xx_ll_tim.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\project\ST\ll\stm32f7xx_ll_tim.h</name>
             </file>
             <file>
                 <name>$PROJ_DIR$\..\project\ST\ll\stm32f7xx_ll_usart.c</name>
