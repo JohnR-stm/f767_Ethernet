@@ -12,6 +12,7 @@
 
 #include "led_hw.h"
 #include "spi_hw_app.h"
+#include "tim_hw_app.h"
 
 #define PHY_ADDRESS     0x0
 
@@ -50,6 +51,8 @@ uint16_t phy_status = 0;
 uint32_t Value = 0;
 
 uint8_t spi_flag = 0;
+
+uint8_t get_spectrum_flag = 0; /// extern IN TIMERS
 
 extern uint16_t Buf_SPI[CCD_SZ];
 
@@ -276,8 +279,11 @@ uint8_t DefinePackage(uint8_t * buf_input)
       if ( buf_input[12] == 0x08 &&
            buf_input[13] == 0x00)         // IP
       {
-        if (buf_input[42] == 0xAA)
-          return 3;
+        if (buf_input[43] == 0xAA)
+          return 3; // START
+        else 
+          if (buf_input[43] == 0xA1)
+          return 4; // STOP
         else
           return 2; 
       }
@@ -739,8 +745,12 @@ void ETH_HandleRxInterrupt(void)
         SendIPResponse();
       else if (resp == 3)
         //--- if IP - Spectrum Response ---//
-        get_spectrum_response();
+        get_spectrum_flag = 1;
+        //get_spectrum_response();
         //send_spectrum_buffer();
+      else if (resp == 4)
+        //--- OFF ---//
+        get_spectrum_flag = 0;
       else 
         //--- if Other ---
         led_green_blink();

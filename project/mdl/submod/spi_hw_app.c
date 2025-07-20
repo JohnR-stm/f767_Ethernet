@@ -42,6 +42,7 @@ static void spi_pins_init(void);
 static void spi_port_init(void);
 static void spi_dma_init(void);
 static void spi_dma_interrupts_enable(void);
+static void spi_delay(uint32_t period);
 
 void set_SPI_addr (void);
 
@@ -253,6 +254,17 @@ void spi_dma_TX (uint32_t * addr, uint32_t data_len)
 
 //------------------------------------------------------------------------------
 
+static void spi_delay(uint32_t period)
+{
+  for(uint32_t a = 0; a < period; a++)
+  {
+    for(uint16_t b = 0; b < 128; b++) { __NOP(); }
+  }
+}
+
+//------------------------------------------------------------------------------
+
+
 void get_spectrum_response(void)
 {
  
@@ -264,7 +276,8 @@ void get_spectrum_response(void)
   
   while (!LL_SPI_IsActiveFlag_TXE(SPI4));  // ???? ?????????? SPI
   LL_SPI_TransmitData16(SPI4, CMD_TRANSFER_DATA);
-  system_delay(2);
+  //system_delay(1);
+  spi_delay(100);
  
   //LL_DMA_DisableStream(DMA2, LL_DMA_STREAM_1);
   //LL_SPI_DisableDMAReq_TX(SPI4);

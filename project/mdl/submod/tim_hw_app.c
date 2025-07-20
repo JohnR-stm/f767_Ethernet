@@ -20,10 +20,18 @@
 
 #include "system_init.h"
 
+#define TIM_EnableIT_CC1IE(TIMx) SET_BIT(TIMx->DIER, TIM_DIER_CC1IE)
+
+
+//------------------------------------------------------------------------------
+
+uint8_t counter = 0;
 
 //------------------------------------------------------------------------------
 
 static void Tim_sync_init(void);
+
+extern void get_spectrum_response(void);
 
 //------------------------------------------------------------------------------
 //  ALL TIMERS INIT/START
@@ -54,7 +62,7 @@ void ccd_timers_start(void)
 
 static void Tim_sync_init(void)
 {
-  //--- TIM 16 INIT ---//
+  //--- TIM 3 INIT ---//
   
   //--- Peripheral clock enable ---//
   LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_TIM3);
@@ -62,6 +70,7 @@ static void Tim_sync_init(void)
   //--- TIM16 interrupt Init ---//
   NVIC_SetPriority(TIM3_IRQn, NVIC_EncodePriority(NVIC_GetPriorityGrouping(),5, 0));
   NVIC_EnableIRQ(TIM3_IRQn);
+  TIM_EnableIT_CC1IE(TIM3); 
   
   //--- Base Init TIM ---//
   LL_TIM_InitTypeDef TIM_InitStruct = {0};
@@ -107,4 +116,31 @@ static void Tim_sync_init(void)
   SET_BIT(TIM3->EGR, TIM_EGR_UG);
 }
 
+
+//------------------------------------------------------------------------------
+// INTERRUPT TIMER
+//------------------------------------------------------------------------------
+
+void TIM3_IRQHandler(void)
+{
+  if(READ_BIT(TIM3->SR, TIM_SR_UIF)) /// SR reg TIM2 P.870 RM
+  {
+    CLEAR_BIT(TIM3->SR, TIM_SR_UIF);
+    //GPIOB->BSRR = LD4_Pin;             /// PIN SET P.270 RM
+    //flag = 1;
+  }
+  else if(READ_BIT(TIM3->SR, TIM_SR_CC1IF))
+  {
+    CLEAR_BIT(TIM3->SR, TIM_SR_CC1IF);
+    counter++;
+    if (counter == 10)
+    {
+      counter = 0;
+      if (get_spectrum_flag == 1)
+        get_spectrum_response();
+    }
+    
+
+  }
+}
 
